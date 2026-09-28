@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "campaign_id": "accdm_qconvergence_f0p3_q10001_v1",
+  "description": "Exact-hierarchy 10001-bin convergence pilot at log10m_acc=12 and f_acc=0.3.",
+  "points": [
+    {
+      "log10m_acc": 12,
+      "log10f_acc": -0.5228787452803376,
+      "grid_level": 0,
+      "active": true
+    }
+  ],
+  "theory": {
+    "quality": "production",
+    "max_attempts": 1
+  },
+  "fit": {
+    "mode": "one_loop",
+    "strategy": "standard",
+    "source_fit_dirs": [],
+    "k_uv_cut": 20.0,
+    "covariance": "paper_diag",
+    "seeds": [12345, 23456, 34567, 45678, 98762],
+    "expanded_counterterm": true,
+    "full_six_dimensional": false,
+    "no_cutoff_continuation": true,
+    "de_maxiter": 300,
+    "de_popsize": 20,
+    "max_attempts": 3
+  },
+  "cluster": {
+    "conda_exe": "/opt/anaconda3/bin/conda",
+    "theory_env": "class_accdm",
+    "fit_env": "class_accdm",
+    "theory_python": "",
+    "fit_python": "",
+    "theory_max_active": 1,
+    "fit_max_active": 1,
+    "max_user_active": 500,
+    "poll_seconds": 30,
+    "submit_delay_seconds": 0.2
+  }
+}

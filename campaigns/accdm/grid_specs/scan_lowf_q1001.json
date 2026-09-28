@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "campaign_id": "accdm_scan_lowf_q1001_v1",
+  "description": "Production accDM grid for f_acc<=0.1 using the validated 1001-bin exact hierarchy.",
+  "axes": {
+    "log10m_acc": [11, 11.2, 11.4, 11.6, 11.8, 12, 12.2, 12.4, 12.6, 12.8, 13, 13.2, 13.4, 13.6, 13.8, 14, 14.2, 14.4, 14.6, 14.8, 15, 15.2, 15.4, 15.6, 15.8, 16, 16.2, 16.4, 16.6, 16.8, 17, 17.2, 17.4, 17.6, 17.8, 18],
+    "log10f_acc": [-4, -3.8, -3.6, -3.4, -3.2, -3, -2.8, -2.6, -2.4, -2.2, -2, -1.8, -1.6, -1.4, -1.2, -1]
+  },
+  "grid_level": 0,
+  "theory": {
+    "quality": "production",
+    "max_attempts": 3
+  },
+  "fit": {
+    "mode": "one_loop",
+    "strategy": "standard",
+    "source_fit_dirs": [],
+    "k_uv_cut": 20.0,
+    "covariance": "paper_diag",
+    "seeds": [12345, 23456, 34567, 45678, 98762],
+    "expanded_counterterm": true,
+    "full_six_dimensional": false,
+    "no_cutoff_continuation": true,
+    "de_maxiter": 300,
+    "de_popsize": 20,
+    "max_attempts": 3
+  },
+  "cluster": {
+    "conda_exe": "/opt/anaconda3/bin/conda",
+    "theory_env": "class_accdm",
+    "fit_env": "class_accdm",
+    "theory_python": "",
+    "fit_python": "",
+    "theory_max_active": 199,
+    "fit_max_active": 199,
+    "max_user_active": 500,
+    "poll_seconds": 30,
+    "submit_delay_seconds": 0.2
+  }
+}

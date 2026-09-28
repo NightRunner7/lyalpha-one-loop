@@ -1,0 +1,7 @@
+source_label,source_directory,n_upper_points,relative_directory
+high_q5001_original,/home/2/ks405818/Master/lyalpha_one_loop/runs/accdm/accdm_scan_highf_q5001_v1,99,runs/accdm/accdm_scan_highf_q5001_v1
+high_q5001_recovery_10core,/home/2/ks405818/Master/lyalpha_one_loop/runs/accdm/accdm_scan_highf_q5001_recovery_10core_v1,476,runs/accdm/accdm_scan_highf_q5001_recovery_10core_v1
+low_q1001,/home/2/ks405818/Master/lyalpha_one_loop/runs/accdm/accdm_scan_lowf_q1001_v2,443,runs/accdm/accdm_scan_lowf_q1001_v2
+low_q2501_recovery,/home/2/ks405818/Master/lyalpha_one_loop/runs/accdm/accdm_lowf_recovery_q2501_10core_v1,7,runs/accdm/accdm_lowf_recovery_q2501_10core_v1
+loweps_high_q5001,/home/2/ks405818/Master/lyalpha_one_loop/runs/accdm/accdm_scan_loweps_highf_q5001_v1,8,runs/accdm/accdm_scan_loweps_highf_q5001_v1
+loweps_low_q1001,/home/2/ks405818/Master/lyalpha_one_loop/runs/accdm/accdm_scan_loweps_lowf_q1001_v1,89,runs/accdm/accdm_scan_loweps_lowf_q1001_v1

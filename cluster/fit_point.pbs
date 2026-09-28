@@ -1,0 +1,188 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=1:mem=4gb
+#PBS -l walltime=12:00:00
+#PBS -j n
+
+set -Eeuo pipefail
+
+: "${PROJECT_DIR:?PROJECT_DIR is required}"
+: "${CAMPAIGN_DIR:?CAMPAIGN_DIR is required}"
+: "${POINT_ID:?POINT_ID is required}"
+: "${THEORY_FILE:?THEORY_FILE is required}"
+: "${OUTPUT_FILE:?OUTPUT_FILE is required}"
+: "${DATA_DIR:?DATA_DIR is required}"
+: "${MODE:?MODE is required}"
+: "${K_UV_CUT:?K_UV_CUT is required}"
+: "${COVARIANCE:?COVARIANCE is required}"
+: "${SEEDS:?SEEDS is required}"
+: "${ENV_NAME:?ENV_NAME is required when PYTHON_BIN is not set}"
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export PYTHONNOUSERSITE=1
+export PYTHONPATH="${PROJECT_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
+
+STATUS_DIR="${CAMPAIGN_DIR}/status/fit"
+DONE_FILE="${STATUS_DIR}/${POINT_ID}.done.json"
+FAILED_FILE="${STATUS_DIR}/${POINT_ID}.failed.json"
+THEORY_DONE="${CAMPAIGN_DIR}/status/theory/${POINT_ID}.done.json"
+mkdir -p "${STATUS_DIR}" "$(dirname "${OUTPUT_FILE}")"
+rm -f "${FAILED_FILE}"
+
+write_failure() {
+    local exit_code="$1"
+    local temporary="${FAILED_FILE}.tmp.$$"
+    printf '{"point_id":"%s","stage":"fit","exit_code":%d,"job_id":"%s","finished_at":"%s"}\n' \
+        "${POINT_ID}" \
+        "${exit_code}" \
+        "${PBS_JOBID:-unknown}" \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${temporary}"
+    mv "${temporary}" "${FAILED_FILE}"
+}
+
+on_exit() {
+    local exit_code=$?
+    trap - EXIT
+    if (( exit_code != 0 )); then
+        write_failure "${exit_code}"
+    fi
+    exit "${exit_code}"
+}
+trap on_exit EXIT
+
+if [[ -n "${PYTHON_BIN:-}" ]]; then
+    PYTHON_CMD="${PYTHON_BIN}"
+else
+    CONDA_EXE="${CONDA_EXE:-/opt/anaconda3/bin/conda}"
+    eval "$("${CONDA_EXE}" shell.bash hook)"
+    conda activate "${ENV_NAME}"
+    PYTHON_CMD="$(command -v python)"
+fi
+
+cd "${PROJECT_DIR}"
+
+if [[ ! -f "${THEORY_DONE}" ]]; then
+    echo "Theory is not marked complete: ${THEORY_DONE}" >&2
+    exit 2
+fi
+if [[ ! -f "${THEORY_FILE}" ]]; then
+    echo "Theory bundle is missing: ${THEORY_FILE}" >&2
+    exit 3
+fi
+
+echo "============================================================"
+echo "Ly-alpha nuisance fit grid point"
+echo "point_id     : ${POINT_ID}"
+echo "theory       : ${THEORY_FILE}"
+echo "fit mode     : ${MODE}"
+echo "k UV cutoff  : ${K_UV_CUT} h/Mpc"
+echo "covariance   : ${COVARIANCE}"
+echo "seeds        : ${SEEDS}"
+echo "strategy     : ${FIT_STRATEGY:-standard}"
+if [[ "${FIT_STRATEGY:-standard}" == "neighbor_refit" ]]; then
+    echo "fit sources  : ${FIT_SOURCE_DIRS:-missing}"
+fi
+echo "output       : ${OUTPUT_FILE}"
+echo "host         : $(hostname)"
+echo "job ID       : ${PBS_JOBID:-unknown}"
+echo "python       : ${PYTHON_CMD}"
+echo "started      : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "============================================================"
+
+verify_fit() {
+    "${PYTHON_CMD}" scripts/inspect_results.py \
+        --theory "${THEORY_FILE}" \
+        --fit "${OUTPUT_FILE}"
+}
+
+write_done() {
+    "${PYTHON_CMD}" - "${OUTPUT_FILE}" "${DONE_FILE}" "${POINT_ID}" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+fit_path, done_path, point_id = sys.argv[1:]
+fit = json.loads(Path(fit_path).read_text(encoding="utf-8"))
+chi2 = {mode: float(record["chi2"]) for mode, record in fit.get("fits", {}).items()}
+payload = {
+    "point_id": point_id,
+    "stage": "fit",
+    "fit_file": str(Path(fit_path).resolve()),
+    "chi2": chi2,
+    "delta_chi2_one_loop_minus_linear": fit.get("delta_chi2_one_loop_minus_linear"),
+    "finished_at": datetime.now(timezone.utc).isoformat(),
+}
+path = Path(done_path)
+temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+os.replace(temporary, path)
+PY
+}
+
+if [[ -f "${OUTPUT_FILE}" ]]; then
+    if verify_fit; then
+        echo "Existing fit is valid; no recomputation is needed."
+        write_done
+        exit 0
+    fi
+    echo "Existing fit failed validation and will be replaced."
+fi
+
+if [[ "${FIT_STRATEGY:-standard}" == "neighbor_refit" ]]; then
+    if [[ -z "${FIT_SOURCE_DIRS:-}" ]]; then
+        echo "FIT_SOURCE_DIRS is required for neighbor_refit." >&2
+        exit 4
+    fi
+    IFS=':' read -r -a SOURCE_DIR_ARRAY <<< "${FIT_SOURCE_DIRS}"
+    FIT_ARGUMENTS=(
+        --campaign-dir "${CAMPAIGN_DIR}"
+        --point-id "${POINT_ID}"
+        --theory "${THEORY_FILE}"
+        --data-dir "${DATA_DIR}"
+        --mode "${MODE}"
+        --k-uv-cut "${K_UV_CUT}"
+        --covariance "${COVARIANCE}"
+        --output "${OUTPUT_FILE}"
+    )
+    for source_dir in "${SOURCE_DIR_ARRAY[@]}"; do
+        FIT_ARGUMENTS+=(--source-fit-dir "${source_dir}")
+    done
+    if [[ "${EXPANDED_COUNTERTERM:-0}" == "1" ]]; then
+        FIT_ARGUMENTS+=(--expanded-counterterm)
+    fi
+    if [[ "${FULL_SIX_DIMENSIONAL:-0}" == "1" ]]; then
+        FIT_ARGUMENTS+=(--full-six-dimensional)
+    fi
+    "${PYTHON_CMD}" -u scripts/refit_p1d_neighbors.py "${FIT_ARGUMENTS[@]}"
+else
+    IFS=':' read -r -a SEED_ARRAY <<< "${SEEDS}"
+    FIT_ARGUMENTS=(
+        --theory "${THEORY_FILE}"
+        --data-dir "${DATA_DIR}"
+        --mode "${MODE}"
+        --k-uv-cut "${K_UV_CUT}"
+        --covariance "${COVARIANCE}"
+        --seeds "${SEED_ARRAY[@]}"
+        --de-maxiter "${DE_MAXITER:-300}"
+        --de-popsize "${DE_POPSIZE:-20}"
+        --output "${OUTPUT_FILE}"
+    )
+    if [[ "${EXPANDED_COUNTERTERM:-0}" == "1" ]]; then
+        FIT_ARGUMENTS+=(--expanded-counterterm)
+    fi
+    if [[ "${FULL_SIX_DIMENSIONAL:-0}" == "1" ]]; then
+        FIT_ARGUMENTS+=(--full-six-dimensional)
+    fi
+    if [[ "${NO_CUTOFF_CONTINUATION:-0}" == "1" ]]; then
+        FIT_ARGUMENTS+=(--no-cutoff-continuation)
+    fi
+    "${PYTHON_CMD}" -u scripts/fit_p1d.py "${FIT_ARGUMENTS[@]}"
+fi
+
+verify_fit
+write_done
+echo "completed: ${POINT_ID}"

@@ -1,0 +1,62 @@
+{
+  "scope": "TECHNICAL_QA_ONLY_REAL_ARCHIVED_LCDM_SYNTHETIC_COORDINATES_NOT_ACCDM",
+  "passed": true,
+  "n_points": 4,
+  "n_workers": 2,
+  "n_rounds": 2,
+  "initial_point_checkpoints": 8,
+  "all_finished_tasks_reused": true,
+  "partial_resume_reused_seven_tasks": true,
+  "partial_resume_completed_one_task": true,
+  "cross_round_best_nonworsening": true,
+  "maximum_second_round_gain": 1.4210854715202004e-13,
+  "changed_npz_rejected_before_output_write": true,
+  "unsafe_nonempty_outputs_rejected_without_mutation": true,
+  "original_scientific_inputs_unchanged": true,
+  "package_data_unchanged": true,
+  "archived_baseline_chi2": 193.19661059914839,
+  "best_chi2": 193.19661059914813,
+  "scientific_status": "locally_stable_requires_global_checks",
+  "calls": [
+    {
+      "label": "full_two_rounds",
+      "exit_code": 0
+    },
+    {
+      "label": "resume_all_cached",
+      "exit_code": 0
+    },
+    {
+      "label": "resume_one_missing_point",
+      "exit_code": 0
+    },
+    {
+      "label": "existing_output_needs_resume",
+      "exit_code": 2
+    },
+    {
+      "label": "changed_theory_blocks_resume",
+      "exit_code": 2
+    },
+    {
+      "label": "unsafe_output_project_root",
+      "exit_code": 2
+    },
+    {
+      "label": "unsafe_output_project_data",
+      "exit_code": 2
+    },
+    {
+      "label": "unsafe_output_package_root",
+      "exit_code": 2
+    },
+    {
+      "label": "unsafe_output_preflight",
+      "exit_code": 2
+    },
+    {
+      "label": "nonempty_output_rejected",
+      "exit_code": 2
+    }
+  ]
+}

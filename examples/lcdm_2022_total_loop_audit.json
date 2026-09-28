@@ -1,0 +1,20 @@
+{
+  "name": "lcdm_2022_planck_total_loop_audit",
+  "description": "Audit-only alternative to Table 1 of arXiv:2210.06117: total-matter EdS loop instead of the cb massive-neutrino prescription.",
+  "class_params": {
+    "omega_b": 0.02237,
+    "omega_cdm": 0.1200,
+    "100*theta_s": 1.04110,
+    "ln10^{10}A_s": 3.044,
+    "n_s": 0.9649,
+    "tau_reio": 0.0544,
+    "N_ur": 2.0328,
+    "N_ncdm": 1,
+    "m_ncdm": 0.06,
+    "deg_ncdm": 1.0,
+    "T_ncdm": 0.71611
+  },
+  "loop_source": "total",
+  "loop_weight": 1.0,
+  "tags": ["paper-2022", "audit-only", "total-loop"]
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "campaign_id": "accdm_validation_mass11_v1",
+  "description": "Exact-hierarchy validation of the planned lower mass boundary at 1e11 GeV.",
+  "axes": {
+    "log10m_acc": [11],
+    "log10f_acc": [-4, -2, -1, 0]
+  },
+  "grid_level": 0,
+  "theory": {
+    "quality": "production",
+    "max_attempts": 3
+  },
+  "fit": {
+    "mode": "both",
+    "strategy": "standard",
+    "source_fit_dirs": [],
+    "k_uv_cut": 20.0,
+    "covariance": "paper_diag",
+    "seeds": [12345, 23456, 34567, 45678, 98762],
+    "expanded_counterterm": true,
+    "full_six_dimensional": false,
+    "no_cutoff_continuation": true,
+    "de_maxiter": 300,
+    "de_popsize": 20,
+    "max_attempts": 3
+  },
+  "cluster": {
+    "conda_exe": "/opt/anaconda3/bin/conda",
+    "theory_env": "class_accdm",
+    "fit_env": "class_accdm",
+    "theory_python": "",
+    "fit_python": "",
+    "theory_max_active": 10,
+    "fit_max_active": 20,
+    "max_user_active": 300,
+    "poll_seconds": 30,
+    "submit_delay_seconds": 0.2
+  }
+}

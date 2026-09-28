@@ -1,0 +1,157 @@
+{
+  "audit_kind": "READ_ONLY_INPUT_PREFLIGHT_NOT_FIT_RUNNER",
+  "created_utc": "2026-09-25T08:36:22.304333+00:00",
+  "project_root": "/home/2/ks405818/Master/lyalpha_one_loop",
+  "requested_manifests": [
+    "/home/2/ks405818/Master/lyalpha_one_loop/accdm_upper_grid_plan/upper_grid_manifest.csv",
+    "/home/2/ks405818/Master/lyalpha_one_loop/accdm_upper_grid_plan/control_points_manifest.csv"
+  ],
+  "supported_fit_sha256": "845ec6896c8901df8535d2bc8069344842235e1fc38ba4bca7fd5a59acfb30b6",
+  "actual_fit_sha256": "845ec6896c8901df8535d2bc8069344842235e1fc38ba4bca7fd5a59acfb30b6",
+  "canonical_code_supported": true,
+  "canonical_chi2_requested": true,
+  "canonical_chi2_verified_points": 1126,
+  "n_points": 1126,
+  "metadata_passed_points": 1126,
+  "fit_files_available": 1126,
+  "theory_files_available": 1126,
+  "missing_file_records": 0,
+  "errors": 0,
+  "warnings": 0,
+  "unique_input_files": 2262,
+  "unique_input_bytes": 742177798,
+  "data_directories": {
+    "/home/2/ks405818/Master/lyalpha_one_loop/data": {
+      "path": "/home/2/ks405818/Master/lyalpha_one_loop/data",
+      "status": "checked",
+      "files": {
+        "Pk1D_data.dat": {
+          "sha256": "5fb8478a301537af2a530646204c1a9c3efa0c7fe24df18603f095ec1cf7792b",
+          "shape": [
+            455,
+            6
+          ],
+          "size_bytes": 20471
+        },
+        "Pk1D_syst.dat": {
+          "sha256": "010f80b7da6bb933ecf939341e49aae7299a7c0da0dda831aa607f7048d0cdd8",
+          "shape": [
+            455,
+            8
+          ],
+          "size_bytes": 33383
+        },
+        "Pk1D_cor.dat": {
+          "sha256": "8be88a0f90195b55b621ddc45e48defa4af0f3e68f121d28d0f0f9a69d33e6a4",
+          "shape": [
+            455,
+            35
+          ],
+          "size_bytes": 154422
+        }
+      },
+      "selected_points": 245,
+      "selected_redshifts": [
+        3.0,
+        3.2,
+        3.4,
+        3.6,
+        3.8,
+        4.0,
+        4.2
+      ]
+    }
+  },
+  "seed_best_consistent": 30,
+  "seed_best_canonical_verified": 30,
+  "actual_metadata_and_bounds_report": "preflight_points.csv",
+  "actual_bounds_groups": [
+    {
+      "bounds": {
+        "alpha_bias": [
+          -8.0,
+          8.0
+        ],
+        "alpha_ct": [
+          -100.0,
+          100.0
+        ],
+        "beta_F": [
+          -10.0,
+          20.0
+        ],
+        "beta_bias": [
+          -15.0,
+          20.0
+        ],
+        "beta_ct": [
+          -100.0,
+          100.0
+        ],
+        "log_alpha_F": [
+          -11.512925464970229,
+          0.6931471805599453
+        ]
+      },
+      "n_points": 589
+    },
+    {
+      "bounds": {
+        "alpha_bias": [
+          -8.0,
+          8.0
+        ],
+        "alpha_ct": [
+          -1000.0,
+          1000.0
+        ],
+        "beta_F": [
+          -10.0,
+          20.0
+        ],
+        "beta_bias": [
+          -15.0,
+          20.0
+        ],
+        "beta_ct": [
+          -1000.0,
+          1000.0
+        ],
+        "log_alpha_F": [
+          -11.512925464970229,
+          0.6931471805599453
+        ]
+      },
+      "n_points": 537
+    }
+  ],
+  "actual_numerics_groups": [
+    {
+      "numerics": {
+        "k_output_max": 20.0,
+        "k_output_min": 0.001,
+        "k_trust": 2.0,
+        "middle_width": 0.25,
+        "n_linear_input": 5000,
+        "n_output_k": 110,
+        "n_p": 120,
+        "n_q_high": 240,
+        "n_q_low": 240,
+        "n_q_mid": 480,
+        "p13_epsilon_relative": 0.0001,
+        "p13_method": "analytic_closed",
+        "p13_n_mu": 24,
+        "p13_n_q": 501,
+        "q_max": 50.0,
+        "q_min": 1e-05
+      },
+      "n_points": 1126
+    }
+  ],
+  "seeds_are_candidates_only": true,
+  "baseline_was_overwritten": false,
+  "input_files_modified": false,
+  "structural_preflight_passed": true,
+  "ready_for_reprofile": true,
+  "note": "Metadata inspection does not establish optimizer convergence or validity of the cosmological model. Without --verify-chi2 no likelihood reproduction is claimed."
+}

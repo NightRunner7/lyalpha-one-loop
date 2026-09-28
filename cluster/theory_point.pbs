@@ -1,0 +1,138 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=1:mem=8gb
+#PBS -l walltime=24:00:00
+#PBS -j n
+
+set -Eeuo pipefail
+
+: "${PROJECT_DIR:?PROJECT_DIR is required}"
+: "${CAMPAIGN_DIR:?CAMPAIGN_DIR is required}"
+: "${POINT_ID:?POINT_ID is required}"
+: "${MODEL_JSON:?MODEL_JSON is required}"
+: "${OUTPUT_FILE:?OUTPUT_FILE is required}"
+: "${CHECKPOINT_DIR:?CHECKPOINT_DIR is required}"
+: "${QUALITY:?QUALITY is required}"
+: "${ENV_NAME:?ENV_NAME is required when PYTHON_BIN is not set}"
+
+export OMP_NUM_THREADS="${THEORY_THREADS:-1}"
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export PYTHONNOUSERSITE=1
+export PYTHONPATH="${PROJECT_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
+
+STATUS_DIR="${CAMPAIGN_DIR}/status/theory"
+DONE_FILE="${STATUS_DIR}/${POINT_ID}.done.json"
+FAILED_FILE="${STATUS_DIR}/${POINT_ID}.failed.json"
+mkdir -p "${STATUS_DIR}" "$(dirname "${OUTPUT_FILE}")" "${CHECKPOINT_DIR}"
+rm -f "${FAILED_FILE}"
+
+write_failure() {
+    local exit_code="$1"
+    local temporary="${FAILED_FILE}.tmp.$$"
+    printf '{"point_id":"%s","stage":"theory","exit_code":%d,"job_id":"%s","finished_at":"%s"}\n' \
+        "${POINT_ID}" \
+        "${exit_code}" \
+        "${PBS_JOBID:-unknown}" \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${temporary}"
+    mv "${temporary}" "${FAILED_FILE}"
+}
+
+on_exit() {
+    local exit_code=$?
+    trap - EXIT
+    if (( exit_code != 0 )); then
+        write_failure "${exit_code}"
+    fi
+    exit "${exit_code}"
+}
+trap on_exit EXIT
+
+if [[ -n "${PYTHON_BIN:-}" ]]; then
+    PYTHON_CMD="${PYTHON_BIN}"
+else
+    CONDA_EXE="${CONDA_EXE:-/opt/anaconda3/bin/conda}"
+    eval "$("${CONDA_EXE}" shell.bash hook)"
+    conda activate "${ENV_NAME}"
+    PYTHON_CMD="$(command -v python)"
+fi
+
+cd "${PROJECT_DIR}"
+
+echo "============================================================"
+echo "Ly-alpha theory grid point"
+echo "point_id     : ${POINT_ID}"
+echo "quality      : ${QUALITY}"
+echo "model JSON   : ${MODEL_JSON}"
+echo "output       : ${OUTPUT_FILE}"
+echo "checkpoint   : ${CHECKPOINT_DIR}"
+echo "host         : $(hostname)"
+echo "job ID       : ${PBS_JOBID:-unknown}"
+echo "python       : ${PYTHON_CMD}"
+echo "started      : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "============================================================"
+
+verify_theory() {
+    "${PYTHON_CMD}" - "${OUTPUT_FILE}" "${MODEL_JSON}" <<'PY'
+import json
+import sys
+
+from lyalpha_pt.theory import load_theory
+
+theory_path, model_path = sys.argv[1:]
+bundle = load_theory(theory_path)
+expected_model = json.load(open(model_path, encoding="utf-8"))["name"]
+actual_model = bundle.metadata["model"]["name"]
+if actual_model != expected_model:
+    raise SystemExit(
+        f"Theory/model mismatch: bundle={actual_model!r}, expected={expected_model!r}"
+    )
+print(f"verified theory digest: {bundle.metadata['bundle_digest']}")
+PY
+}
+
+write_done() {
+    "${PYTHON_CMD}" - "${OUTPUT_FILE}" "${DONE_FILE}" "${POINT_ID}" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+from lyalpha_pt.theory import load_theory
+
+theory_path, done_path, point_id = sys.argv[1:]
+bundle = load_theory(theory_path)
+payload = {
+    "point_id": point_id,
+    "stage": "theory",
+    "theory_file": str(Path(theory_path).resolve()),
+    "theory_digest": bundle.metadata["bundle_digest"],
+    "model_name": bundle.metadata["model"]["name"],
+    "finished_at": datetime.now(timezone.utc).isoformat(),
+}
+path = Path(done_path)
+temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+os.replace(temporary, path)
+PY
+}
+
+if [[ -f "${OUTPUT_FILE}" ]]; then
+    if verify_theory; then
+        echo "Existing theory bundle is valid; no recomputation is needed."
+        write_done
+        exit 0
+    fi
+    echo "Existing theory bundle failed validation and will be replaced."
+fi
+
+"${PYTHON_CMD}" -u scripts/generate_theory.py \
+    --model-json "${MODEL_JSON}" \
+    --quality "${QUALITY}" \
+    --output "${OUTPUT_FILE}" \
+    --checkpoint-dir "${CHECKPOINT_DIR}"
+
+verify_theory
+write_done
+echo "completed: ${POINT_ID}"

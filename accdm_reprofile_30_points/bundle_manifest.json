@@ -1,0 +1,23 @@
+{
+  "package": "accdm_reprofile_30_points",
+  "version": "1.0.0",
+  "planned_points": 30,
+  "pilot_points": 4,
+  "tests_passed": 30,
+  "production_accdm_campaign_executed": false,
+  "files": {
+    "11_reprofile_accdm_30_points.ipynb": "598e1333ace34dc56b61c27e11e686d14d8daebe3b94c30b19e54f6627f8e185",
+    "README.md": "696b35b227f1d4239c0532d5f46d59a5c99b173ab81a8ebe743c005703d21e37",
+    "VERIFICATION.md": "de73e7ed7f0b4ca3fddc4605e9b6882d8f726333fa79942a13b5d96d76709dfc",
+    "accdm_reprofile/__init__.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "accdm_reprofile/campaign.py": "76511d3b3055c54e80d3177407302b4187436471a6d4bff3831c61b896980710",
+    "accdm_reprofile/inputs.py": "8e8429cd75dd6418f53544dca725a2b44c1bb7995ae647681fa8ca20443282ec",
+    "accdm_reprofile/profiler.py": "f0dfdc7aefa41fd00bdfdac1970d9b7d3bb5b23c8347f08649529c9ee82ffa7a",
+    "accdm_reprofile/report.py": "60a6e67effcfa2afb87ecbb241a305b0a8f7fe66d6ce3f9d640b4edb864e69c3",
+    "accdm_reprofile/residuals.py": "cdbd289d29860feb74318a37fdcfae51f14e5567aa1539c85ce76e7ab600e4ad",
+    "baseline_selected_raw_points.csv": "c380b46ec4c6525544134e506d3c974d25e468765ebfc5668ab8890c7ea1f9f4",
+    "pilot_points.csv": "d8ffb1546d4944175e2c0dda4790502dbf1ad67dca5c59936318eda1a1778ce3",
+    "run_reprofile.py": "5fc7995faee8fcdf90fed65c1d8b837c83fd05e0fad875b838aea6a97e6fa27a",
+    "verification_test_log.txt": "da52437e9b9140f20a1aecc7ee2f1075acb31a1d74e52f4f997f2e058b3a6965"
+  }
+}

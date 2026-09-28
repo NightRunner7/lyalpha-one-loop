@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lyalpha-one-loop"
+version = "3.9.3"
+description = "Reproducible BOSS Ly-alpha P1D effective-model benchmark"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.10"]
+
+[project.optional-dependencies]
+generator = ["classy>=3.3"]
+validation = ["matplotlib>=3.7", "fast-pt==4.0.0"]
+notebook = ["jupyter>=1.0", "matplotlib>=3.7", "pandas>=2.0"]
+
+[project.scripts]
+lya-campaign = "cluster.campaign_manager:main"
+lya-build-dcdm-grid = "campaigns.dcdm.build_grid:main"
+lya-build-accdm-grid = "campaigns.accdm.build_grid:main"
+lya-accdm-validation-suite = "campaigns.accdm.validation_suite:main"
+lya-accdm-adaptive-scan = "campaigns.accdm.adaptive_scan:main"
+lya-accdm-prepare-highf-recovery = "campaigns.accdm.prepare_highf_recovery:main"
+
+[tool.setuptools]
+packages = ["lyalpha_pt", "cluster", "campaigns", "campaigns.dcdm", "campaigns.accdm"]
+
+[tool.setuptools.package-data]
+"campaigns.dcdm" = ["base_model.json", "grid_specs/*.json"]
+"campaigns.accdm" = ["base_model.json", "base_models/*.json", "grid_specs/*.json"]

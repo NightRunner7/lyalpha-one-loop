@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "campaign_id": "accdm_scan_highf_q1001_scout_v1",
+  "description": "Exploratory high-fraction accDM scan on the production coordinates using 1001 daughter momentum bins; not intended as the final numerical result.",
+  "axes": {
+    "log10m_acc": [11, 11.1428571428571, 11.2857142857143, 11.4285714285714, 11.5714285714286, 11.7142857142857, 11.8571428571429, 12, 12.1428571428571, 12.2857142857143, 12.4285714285714, 12.5714285714286, 12.7142857142857, 12.8571428571429, 13, 13.1428571428571, 13.2857142857143, 13.4285714285714, 13.5714285714286, 13.7142857142857, 13.8571428571429, 14, 14.1428571428571, 14.2857142857143, 14.4285714285714, 14.5714285714286, 14.7142857142857, 14.8571428571429, 15, 15.1428571428571, 15.2857142857143, 15.4285714285714, 15.5714285714286, 15.7142857142857, 15.8571428571429, 16, 16.1428571428571, 16.2857142857143, 16.4285714285714, 16.5714285714286, 16.7142857142857, 16.8571428571429, 17, 17.1428571428571, 17.2857142857143, 17.4285714285714, 17.5714285714286, 17.7142857142857, 17.8571428571429, 18],
+    "log10f_acc": [-0.925, -0.85, -0.775, -0.7, -0.625, -0.55, -0.475, -0.4, -0.3, -0.2, -0.1, 0]
+  },
+  "grid_level": 0,
+  "theory": {
+    "quality": "production",
+    "max_attempts": 1
+  },
+  "fit": {
+    "mode": "one_loop",
+    "strategy": "standard",
+    "source_fit_dirs": [],
+    "k_uv_cut": 20.0,
+    "covariance": "paper_diag",
+    "seeds": [12345, 23456, 34567, 45678, 98762],
+    "expanded_counterterm": true,
+    "full_six_dimensional": false,
+    "no_cutoff_continuation": true,
+    "de_maxiter": 300,
+    "de_popsize": 20,
+    "max_attempts": 3
+  },
+  "cluster": {
+    "conda_exe": "/opt/anaconda3/bin/conda",
+    "theory_env": "class_accdm",
+    "fit_env": "class_accdm",
+    "theory_python": "",
+    "fit_python": "",
+    "theory_ncpus": 10,
+    "theory_threads": 10,
+    "theory_mem": "4gb",
+    "fit_ncpus": 1,
+    "fit_mem": "4gb",
+    "theory_max_active": 120,
+    "fit_max_active": 500,
+    "max_user_active": 650,
+    "poll_seconds": 30,
+    "submit_delay_seconds": 0.2
+  }
+}

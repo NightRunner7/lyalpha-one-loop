@@ -1,0 +1,36 @@
+{
+  "description": "Planck-2018 DCDM -> WDM + DR setup for the merging_with_master class_decays branch used in arXiv:2210.06117.",
+  "class_params": {
+    "100*theta_s": 1.0411,
+    "ln10^{10}A_s": 3.044,
+    "n_s": 0.9649,
+    "omega_b": 0.02237,
+    "tau_reio": 0.0544,
+    "N_ur": 2.0328,
+    "omega_cdm": 1e-05,
+    "omega_ini_dcdm2": 0.12,
+    "M_dcdm": 1.0,
+    "N_ncdm": 2,
+    "background_ncdm_distribution": "0, 1",
+    "m_ncdm": "0.06, 0",
+    "deg_ncdm": "1, 1",
+    "T_ncdm": "0.71611, 1.0",
+    "Quadrature strategy": "0, 4",
+    "Number of momentum bins perturbs": "50, 300",
+    "evolver": 0,
+    "l_max_ncdm": 17,
+    "ncdm_fluid_approximation": 2,
+    "ncdm_fluid_trigger_tau_over_tau_k": 25,
+    "massive_daughter_perturbations": "yes",
+    "dark_radiation_perturbations": "yes"
+  },
+  "loop_source": "total",
+  "loop_weight": 1.0,
+  "name_prefix": "dcdm",
+  "tags": [
+    "paper-2022",
+    "dcdm",
+    "class-decays-merging-with-master"
+  ]
+}
+

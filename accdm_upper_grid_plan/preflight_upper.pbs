@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -N accdm_upper_audit
+#PBS -l select=1:ncpus=1:mem=4gb
+#PBS -l walltime=01:00:00
+#PBS -j oe
+
+set -Eeuo pipefail
+: "${PROJECT_ROOT:?Submit from the project root with PROJECT_ROOT exported.}"
+: "${PYTHON_BIN:?Export the Python interpreter from the working fit environment.}"
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export PYTHONNOUSERSITE=1
+
+cd "${PROJECT_ROOT}"
+audit_args=(
+  "${PROJECT_ROOT}/accdm_upper_grid_plan/audit_upper_inputs.py"
+  --project-root "${PROJECT_ROOT}"
+  --seed-dir "${SEED_DIR:-${PROJECT_ROOT}/runs/accdm/reprofile_30_v1}"
+  --out "${AUDIT_OUT:-${PROJECT_ROOT}/runs/accdm/reprofile_upper_v2/preflight}"
+)
+if [[ "${VERIFY_CHI2:-1}" == "1" ]]; then
+  audit_args+=(--verify-chi2)
+fi
+if [[ -n "${DATA_DIR:-}" ]]; then
+  audit_args+=(--data-dir "${DATA_DIR}")
+fi
+"${PYTHON_BIN}" "${audit_args[@]}"

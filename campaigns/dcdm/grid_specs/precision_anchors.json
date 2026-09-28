@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "campaign_id": "dcdm_precision_anchors_v1",
+  "description": "Precision cross-checks for the published best-fit point and an LCDM-like DCDM corner.",
+  "points": [
+    {"tau_gyr": 40, "epsilon_dcdm": 0.006, "grid_level": 0},
+    {"tau_gyr": 1000, "epsilon_dcdm": 0.0001, "grid_level": 0}
+  ],
+  "theory": {
+    "quality": "precision",
+    "max_attempts": 3
+  },
+  "fit": {
+    "mode": "both",
+    "k_uv_cut": 20.0,
+    "covariance": "paper_diag",
+    "seeds": [12345, 23456, 34567, 45678, 98762],
+    "expanded_counterterm": true,
+    "full_six_dimensional": false,
+    "no_cutoff_continuation": false,
+    "de_maxiter": 300,
+    "de_popsize": 20,
+    "max_attempts": 3
+  },
+  "cluster": {
+    "conda_exe": "/opt/anaconda3/bin/conda",
+    "theory_env": "class_decays",
+    "fit_env": "class_decays",
+    "theory_python": "",
+    "fit_python": "",
+    "theory_max_active": 10,
+    "fit_max_active": 20,
+    "max_user_active": 100,
+    "poll_seconds": 30,
+    "submit_delay_seconds": 0.2
+  }
+}
+

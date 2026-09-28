@@ -1,0 +1,78 @@
+accDM high-fraction q=5001 campaign update (v3.9.2)
+====================================================
+
+Purpose
+-------
+This update replaces the gated 600-point high-fraction q=10001 campaign with
+an independent q=5001 campaign.  Each theory point requests two PBS cores,
+uses two CLASS worker threads, and requests 4 GB of memory.  Fit jobs remain
+single-core.  PBS resources are read from campaign.json; editing the shared
+PBS template is no longer required.
+
+The existing runs/accdm/accdm_scan_highf_q10001_v2 directory is not modified
+or deleted.  The new immutable run directory is:
+
+    runs/accdm/accdm_scan_highf_q5001_v1
+
+Install and test
+----------------
+
+    cd ~/Master/lyalpha_one_loop
+    python -m pip install -e .
+    python -m unittest discover -s tests -v
+
+Prevent accidental use of the old q=10001 high-fraction campaign
+-----------------------------------------------------------------
+
+    python cluster/campaign_manager.py stop \
+      --campaign runs/accdm/accdm_scan_highf_q10001_v2
+
+Build and inspect the new q=5001 campaign
+------------------------------------------
+
+    python campaigns/accdm/adaptive_scan.py build
+    python campaigns/accdm/adaptive_scan.py status --group high
+    python campaigns/accdm/adaptive_scan.py dry-run --group high
+
+The dry-run qsub command must contain both:
+
+    THEORY_THREADS=2
+    -l select=1:ncpus=2:mem=4gb
+
+Run theory first
+----------------
+
+    tmux new -s accdm_highf_q5001_theory
+
+    python -u campaigns/accdm/adaptive_scan.py watch \
+      --group high \
+      --stages theory
+
+Detach with Ctrl-b, then d.  Monitor from another terminal:
+
+    python campaigns/accdm/adaptive_scan.py status --group high
+
+The campaign contains 600 theory jobs.  At two cores per point it can use up
+to 1200 cores.  The campaign-level limits are theory_max_active=600 and
+max_user_active=650, so unrelated jobs visible to qstat can temporarily reduce
+the number of submitted campaign jobs.
+
+Run fits only after theory is complete
+--------------------------------------
+
+    tmux new -s accdm_highf_q5001_fit
+
+    python -u campaigns/accdm/adaptive_scan.py watch \
+      --group high \
+      --stages fit
+
+The fit stage requests one core and 4 GB per job.
+
+Stop and resume controllers
+---------------------------
+
+    python campaigns/accdm/adaptive_scan.py stop --group high
+    python campaigns/accdm/adaptive_scan.py resume --group high
+
+Stopping a controller does not cancel PBS jobs that have already been
+submitted.

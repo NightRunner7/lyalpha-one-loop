@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "campaign_id": "accdm_lowf_recovery_q2501_pilot_v1",
+  "description": "RK q=2501 recovery pilot containing one failed q=1001 point and one stable control point.",
+  "points": [
+    {
+      "log10m_acc": 12.0,
+      "log10f_acc": -1.075,
+      "grid_level": 0,
+      "active": true
+    },
+    {
+      "log10m_acc": 12.0,
+      "log10f_acc": -1.0,
+      "grid_level": 0,
+      "active": true
+    }
+  ],
+  "theory": {
+    "quality": "production",
+    "max_attempts": 2
+  },
+  "fit": {
+    "mode": "one_loop",
+    "strategy": "standard",
+    "source_fit_dirs": [],
+    "k_uv_cut": 20.0,
+    "covariance": "paper_diag",
+    "seeds": [
+      12345,
+      23456,
+      34567,
+      45678,
+      98762
+    ],
+    "expanded_counterterm": true,
+    "full_six_dimensional": false,
+    "no_cutoff_continuation": true,
+    "de_maxiter": 300,
+    "de_popsize": 20,
+    "max_attempts": 3
+  },
+  "cluster": {
+    "conda_exe": "/opt/anaconda3/bin/conda",
+    "theory_env": "class_accdm",
+    "fit_env": "class_accdm",
+    "theory_python": "",
+    "fit_python": "",
+    "theory_max_active": 2,
+    "fit_max_active": 2,
+    "max_user_active": 500,
+    "poll_seconds": 30,
+    "submit_delay_seconds": 0.2
+  }
+}

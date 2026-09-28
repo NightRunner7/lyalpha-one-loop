@@ -1,0 +1,93 @@
+{
+  "status": "campaign_design_not_a_fitting_runner",
+  "selection": {
+    "log10f_min": -1.6,
+    "log10f_max": 0,
+    "n_upper": 1122,
+    "n_lower_controls": 4,
+    "n_missing_rectangle_cells": 138
+  },
+  "frozen_reference": {
+    "chi2": 188.42959746601295,
+    "coordinate_key": "12.7142857143|-0.2000000000"
+  },
+  "new_output_root": "runs/accdm/reprofile_upper_v2",
+  "same_bounds_stage": {
+    "original_pointwise_bounds": true,
+    "starts_ranked_after_amplitude_profile": true,
+    "active_branch_bank": 6,
+    "local_starts_per_point_per_round": 4,
+    "local_budget": 2000,
+    "escalated_local_budget": 5000,
+    "stable_rounds_required": 2,
+    "initial_max_rounds": 12,
+    "limit_status": "unresolved_not_converged",
+    "improvement_tolerance": 0.01,
+    "contour_tolerance": 0.003,
+    "contour_band_abs_delta_from_5p991": 1.0
+  },
+  "common_domain_stage": {
+    "name": "B_common_ct1000",
+    "alpha_ct_bounds": [
+      -1000,
+      1000
+    ],
+    "beta_ct_bounds": [
+      -1000,
+      1000
+    ],
+    "beta_bias_bounds": [
+      -15,
+      20
+    ],
+    "n_upper_with_changed_domain": 587,
+    "comparison_to_stage_A_separate": true
+  },
+  "bounds_sensitivity_stage": {
+    "name": "C_beta_bias_sensitivity",
+    "candidate_lower_limits": [
+      -20,
+      -30
+    ],
+    "upper_limit": 20,
+    "separate_scenario": true,
+    "require_common_reference_per_scenario": true
+  },
+  "global_search": {
+    "beta_ct_strata": [
+      -1000,
+      -100,
+      -20,
+      0,
+      20,
+      100,
+      1000
+    ],
+    "seed_examples": [
+      12345,
+      23456
+    ],
+    "per_anchor_budget": [
+      20000,
+      40000
+    ],
+    "baseline_bounds_intersection_required": true,
+    "proof_of_global_minimum": false
+  },
+  "parallelism": {
+    "frozen_bank_per_round": true,
+    "suggested_job_cpus": 1,
+    "blas_threads": 1,
+    "max_concurrent_jobs_initial": 8,
+    "points_per_job_initial": 32,
+    "each_job_private_output": true,
+    "fit_queue_walltime": "to_be_calibrated_from_validation_batch"
+  },
+  "files": {
+    "baseline_full_snapshot.csv": "c380b46ec4c6525544134e506d3c974d25e468765ebfc5668ab8890c7ea1f9f4",
+    "upper_grid_manifest.csv": "8c2ea7948144f81d5554a72ca0bc1891258a004d6bb63346c4e04bcc7efb3e2c",
+    "control_points_manifest.csv": "9685f40eff03f3f7199eecd8d0c9addff98cfb8b2e8979bc543722a900fe4a1b",
+    "seed_best_points.csv": "d4d49be02845717d0ec8d8fa4869648d0f16b1dabb28a3c159dc85f5a04ce7a6",
+    "seed_attempts.csv": "fe9932eccfb40d28a491f6280fb8c2389214e3c7fe52f7d4424a0c6c4e151864"
+  }
+}

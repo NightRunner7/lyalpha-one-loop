@@ -1,0 +1,525 @@
+#!/usr/bin/env python3
+"""Build an immutable accDM model manifest for a resumable grid campaign."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import itertools
+import json
+import math
+import os
+import tempfile
+from decimal import Decimal
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+from lyalpha_pt.models import ModelSpec
+
+
+GRID_AXES = ("log10m_acc", "log10f_acc")
+MANIFEST_FIELDS = (
+    "index",
+    "point_id",
+    "active",
+    "grid_level",
+    "log10m_acc",
+    "log10f_acc",
+    "m_acc_in_GeV",
+    "eta_acc",
+    "f_acc",
+    "omega_cdm",
+    "model_json",
+    "model_hash",
+)
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _digest(value: Any) -> str:
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _number_token(value: float) -> str:
+    text = format(Decimal(str(value)).normalize(), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text.replace("-", "m").replace(".", "p")
+
+
+def point_id(log10m_acc: float, log10f_acc: float) -> str:
+    """Return a filesystem-safe identifier for one accDM grid point."""
+
+    return (
+        f"accdm_logm{_number_token(log10m_acc)}_"
+        f"logf{_number_token(log10f_acc)}"
+    )
+
+
+def fixed_early_omega_cdm(
+    omega_cdm_early_total: float,
+    f_acc: float,
+    *,
+    kappa_acc: float,
+    a_t_acc: float,
+    a_recombination: float,
+) -> float:
+    """Return the present stable-CDM input that fixes early total CDM.
+
+    The accDM background obeys Eq. (2.1) of the model definition.  The
+    denominator below ensures that the pre-acceleration density at
+    recombination equals ``omega_cdm_early_total`` for every grid point.
+    """
+
+    omega = float(omega_cdm_early_total)
+    fraction = float(f_acc)
+    kappa = float(kappa_acc)
+    transition = float(a_t_acc)
+    a_rec = float(a_recombination)
+    if not omega > 0.0:
+        raise ValueError("omega_cdm_early_total must be positive.")
+    if not 0.0 <= fraction <= 1.0:
+        raise ValueError("f_acc must satisfy 0 <= f_acc <= 1.")
+    if not kappa > 0.0 or not 0.0 < transition < 1.0:
+        raise ValueError("kappa_acc must be positive and 0 < a_t_acc < 1.")
+    if not 0.0 < a_rec < 1.0:
+        raise ValueError("a_recombination must satisfy 0 < a < 1.")
+    converted_ratio = (1.0 - a_rec**kappa) / (
+        1.0 + (a_rec / transition) ** kappa
+    )
+    return omega / (1.0 + fraction * converted_ratio)
+
+
+def _atomic_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    os.close(fd)
+    temporary = Path(temporary_name)
+    try:
+        temporary.write_text(text, encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _atomic_json(path: Path, value: Any) -> None:
+    _atomic_text(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
+
+
+def _truthy(value: Any) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _load_json_object(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must contain one JSON object.")
+    return value
+
+
+def _expand_points(spec: Mapping[str, Any]) -> list[dict[str, Any]]:
+    has_points = "points" in spec
+    has_axes = "axes" in spec
+    if has_points == has_axes:
+        raise ValueError("Grid spec must contain exactly one of 'points' or 'axes'.")
+
+    if has_points:
+        raw_points = spec["points"]
+        if not isinstance(raw_points, list):
+            raise ValueError("'points' must be a list.")
+        points = [dict(item) for item in raw_points]
+    else:
+        axes = spec["axes"]
+        if not isinstance(axes, dict):
+            raise ValueError("'axes' must be an object.")
+        mass_values = axes.get("log10m_acc")
+        fraction_values = axes.get("log10f_acc")
+        if not isinstance(mass_values, list) or not isinstance(fraction_values, list):
+            raise ValueError("Both accDM axes must be lists.")
+        points = [
+            {
+                "log10m_acc": log_mass,
+                "log10f_acc": log_fraction,
+                "grid_level": spec.get("grid_level", 0),
+                "active": True,
+            }
+            for log_mass, log_fraction in itertools.product(
+                mass_values, fraction_values
+            )
+        ]
+
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in points:
+        if not set(GRID_AXES).issubset(raw):
+            raise ValueError("Every point needs log10m_acc and log10f_acc.")
+        log_mass = float(raw["log10m_acc"])
+        log_fraction = float(raw["log10f_acc"])
+        if not math.isfinite(log_mass) or not 9.0 <= log_mass <= 19.5:
+            raise ValueError(
+                f"Invalid log10m_acc={log_mass}; expected the configured range 9--19.5."
+            )
+        if not math.isfinite(log_fraction) or not -4.0 <= log_fraction <= 0.0:
+            raise ValueError(
+                f"Invalid log10f_acc={log_fraction}; expected the configured range -4--0."
+            )
+        identifier = point_id(log_mass, log_fraction)
+        if identifier in seen:
+            raise ValueError(f"Duplicate accDM coordinate: {identifier}.")
+        seen.add(identifier)
+        normalized.append(
+            {
+                "point_id": identifier,
+                "log10m_acc": log_mass,
+                "log10f_acc": log_fraction,
+                "grid_level": int(raw.get("grid_level", spec.get("grid_level", 0))),
+                "active": bool(raw.get("active", True)),
+            }
+        )
+    return normalized
+
+
+def _validate_base_model(base: Mapping[str, Any]) -> None:
+    required = {
+        "class_params",
+        "loop_source",
+        "loop_weight",
+        "omega_cdm_early_total",
+        "a_recombination",
+    }
+    missing = required.difference(base)
+    if missing:
+        raise ValueError(f"Base model is missing keys: {sorted(missing)}")
+    params = base["class_params"]
+    if not isinstance(params, dict):
+        raise ValueError("class_params must be an object.")
+    forbidden = {
+        "output",
+        "P_k_max_h/Mpc",
+        "z_max_pk",
+        "omega_cdm",
+        "m_acc_in_GeV",
+        "m_cdm_in_GeV",
+        "eta_acc",
+        "f_acc",
+    }.intersection(params)
+    if forbidden:
+        raise ValueError(
+            "The accDM base model contains builder- or generator-owned CLASS keys: "
+            + ", ".join(sorted(forbidden))
+        )
+    if int(params.get("N_ncdm", -1)) != 2:
+        raise ValueError("accDM requires two NCDM entries: neutrino and accDM.")
+    if not math.isclose(float(params.get("N_ur", -1.0)), 2.0308, rel_tol=0, abs_tol=1e-10):
+        raise ValueError("The selected accDM neutrino convention requires N_ur=2.0308.")
+    masses = [value.strip() for value in str(params.get("m_ncdm", "")).split(",")]
+    degeneracies = [
+        value.strip() for value in str(params.get("deg_ncdm", "")).split(",")
+    ]
+    if len(masses) != 2 or not math.isclose(float(masses[0]), 0.06):
+        raise ValueError("The first NCDM entry must be the 0.06 eV neutrino.")
+    if len(degeneracies) != 2 or not math.isclose(float(degeneracies[0]), 1.0):
+        raise ValueError("The massive-neutrino NCDM entry must have degeneracy one.")
+    if int(params.get("ncdm_fluid_approximation", -1)) != 3:
+        raise ValueError("Scientific accDM campaigns require the exact hierarchy (value 3).")
+    if str(params.get("vary_Gamma_acc", "")).strip().lower() != "yes":
+        raise ValueError("accDM base model requires vary_Gamma_acc='yes'.")
+    if not float(params.get("kappa_acc", 0.0)) > 0.0:
+        raise ValueError("accDM base model needs positive kappa_acc.")
+    if not 0.0 < float(params.get("a_t_acc", 0.0)) < 1.0:
+        raise ValueError("accDM base model needs 0 < a_t_acc < 1.")
+
+
+def _model_for_point(base: Mapping[str, Any], point: Mapping[str, Any]) -> ModelSpec:
+    params = dict(base["class_params"])
+    log_mass = float(point["log10m_acc"])
+    log_fraction = float(point["log10f_acc"])
+    mass = 10.0**log_mass
+    fraction = 10.0**log_fraction
+    eta = 1.0e11 / mass
+    omega_cdm = fixed_early_omega_cdm(
+        float(base["omega_cdm_early_total"]),
+        fraction,
+        kappa_acc=float(params["kappa_acc"]),
+        a_t_acc=float(params["a_t_acc"]),
+        a_recombination=float(base["a_recombination"]),
+    )
+    params.update(
+        {
+            "omega_cdm": omega_cdm,
+            "m_acc_in_GeV": mass,
+            "m_cdm_in_GeV": mass,
+            "eta_acc": eta,
+            "f_acc": fraction,
+        }
+    )
+
+    tags = list(base.get("tags", []))
+    tags.extend(
+        [
+            f"log10m-acc:{log_mass:g}",
+            f"log10f-acc:{log_fraction:g}",
+            "omega-cdm:fixed-early-total",
+            "ncdm-hierarchy:exact",
+        ]
+    )
+    description = (
+        f"{base.get('description', 'accDM model')} "
+        f"log10(m_acc/GeV)={log_mass:g}, log10(f_acc)={log_fraction:g}."
+    )
+    model = ModelSpec(
+        name=str(point["point_id"]),
+        description=description,
+        class_params=params,
+        loop_source=str(base.get("loop_source", "total")),
+        loop_weight=base.get("loop_weight", 1.0),
+        tags=tuple(tags),
+    )
+    model.validate()
+    return model
+
+
+def _read_manifest(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    if rows and set(rows[0]) != set(MANIFEST_FIELDS):
+        raise ValueError(f"Existing manifest has unexpected columns: {sorted(rows[0])}")
+    indices = [int(row["index"]) for row in rows]
+    point_ids = [row["point_id"] for row in rows]
+    if len(indices) != len(set(indices)) or len(point_ids) != len(set(point_ids)):
+        raise ValueError("Existing manifest has duplicate indices or point IDs.")
+    return sorted(rows, key=lambda row: int(row["index"]))
+
+
+def _write_manifest(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
+    rows = list(rows)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    os.close(fd)
+    temporary = Path(temporary_name)
+    try:
+        with temporary.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=MANIFEST_FIELDS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row[field] for field in MANIFEST_FIELDS})
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def build_campaign(base_model_path: Path, grid_spec_path: Path, run_dir: Path) -> dict[str, Any]:
+    """Create or safely extend one accDM run directory."""
+
+    base_model_path = base_model_path.resolve()
+    grid_spec_path = grid_spec_path.resolve()
+    run_dir = run_dir.resolve()
+    base = _load_json_object(base_model_path)
+    spec = _load_json_object(grid_spec_path)
+    _validate_base_model(base)
+    points = _expand_points(spec)
+    if not str(spec.get("campaign_id", "")).strip():
+        raise ValueError("Grid spec needs a non-empty campaign_id.")
+
+    existing_config_path = run_dir / "campaign.json"
+    if existing_config_path.exists():
+        existing_config = _load_json_object(existing_config_path)
+        if existing_config.get("campaign_id") != spec["campaign_id"]:
+            raise ValueError("Refusing to change campaign_id inside an existing run directory.")
+        if existing_config.get("base_model_hash") != _digest(base):
+            raise ValueError(
+                "Refusing to change the base model inside an existing run directory. "
+                "Create a new campaign instead."
+            )
+
+    for relative in (
+        "models",
+        "theory",
+        "fits",
+        "checkpoints",
+        "status/theory",
+        "status/fit",
+        "jobs/theory",
+        "jobs/fit",
+        "logs/theory",
+        "logs/fit",
+        "controller",
+    ):
+        (run_dir / relative).mkdir(parents=True, exist_ok=True)
+
+    manifest_path = run_dir / "manifest.csv"
+    rows = _read_manifest(manifest_path)
+    by_point = {row["point_id"]: row for row in rows}
+    next_index = max((int(row["index"]) for row in rows), default=-1) + 1
+
+    for point in points:
+        model = _model_for_point(base, point)
+        payload = model.as_dict()
+        model_hash = _digest(payload)
+        relative_model_path = f"models/{point['point_id']}.json"
+        model_path = run_dir / relative_model_path
+        if model_path.exists():
+            existing_payload = _load_json_object(model_path)
+            if _digest(existing_payload) != model_hash:
+                raise ValueError(
+                    f"Refusing to change immutable model file {model_path}. "
+                    "Use a new campaign directory after changing the base model."
+                )
+        else:
+            _atomic_json(model_path, payload)
+
+        existing_row = by_point.get(str(point["point_id"]))
+        if existing_row is not None:
+            if existing_row["model_hash"] != model_hash:
+                raise ValueError(
+                    f"Manifest/model hash mismatch for {point['point_id']}; "
+                    "use a new campaign directory."
+                )
+            continue
+
+        params = model.class_params
+        row = {
+            "index": next_index,
+            "point_id": point["point_id"],
+            "active": int(point["active"]),
+            "grid_level": point["grid_level"],
+            "log10m_acc": f"{point['log10m_acc']:.16g}",
+            "log10f_acc": f"{point['log10f_acc']:.16g}",
+            "m_acc_in_GeV": f"{float(params['m_acc_in_GeV']):.16g}",
+            "eta_acc": f"{float(params['eta_acc']):.16g}",
+            "f_acc": f"{float(params['f_acc']):.16g}",
+            "omega_cdm": f"{float(params['omega_cdm']):.16g}",
+            "model_json": relative_model_path,
+            "model_hash": model_hash,
+        }
+        rows.append(row)
+        by_point[str(point["point_id"])] = row
+        next_index += 1
+
+    rows.sort(key=lambda row: int(row["index"]))
+    _write_manifest(manifest_path, rows)
+
+    theory = dict(spec.get("theory", {}))
+    fit = dict(spec.get("fit", {}))
+    cluster = dict(spec.get("cluster", {}))
+    quality = theory.get("quality", "production")
+    if quality not in {"smoke", "production", "precision"}:
+        raise ValueError(f"Unsupported theory quality: {quality!r}.")
+    mode = fit.get("mode", "one_loop")
+    if mode not in {"linear", "one_loop", "both"}:
+        raise ValueError(f"Unsupported fit mode: {mode!r}.")
+    fit_strategy = str(fit.get("strategy", "standard"))
+    if fit_strategy not in {"standard", "neighbor_refit"}:
+        raise ValueError(f"Unsupported fit strategy: {fit_strategy!r}.")
+    source_fit_dirs = [str(value) for value in fit.get("source_fit_dirs", [])]
+    if fit_strategy == "neighbor_refit" and not source_fit_dirs:
+        raise ValueError(
+            "fit.strategy='neighbor_refit' requires at least one source_fit_dirs entry."
+        )
+
+    params = base["class_params"]
+    cluster_config = {
+        "conda_exe": cluster.get("conda_exe", "/opt/anaconda3/bin/conda"),
+        "theory_env": cluster.get("theory_env", "class_accdm"),
+        "fit_env": cluster.get("fit_env", cluster.get("theory_env", "class_accdm")),
+        "theory_python": cluster.get("theory_python", ""),
+        "fit_python": cluster.get("fit_python", ""),
+        "theory_ncpus": int(cluster.get("theory_ncpus", 1)),
+        "theory_threads": int(
+            cluster.get("theory_threads", cluster.get("theory_ncpus", 1))
+        ),
+        "theory_mem": str(cluster.get("theory_mem", "8gb")),
+        "fit_ncpus": int(cluster.get("fit_ncpus", 1)),
+        "fit_mem": str(cluster.get("fit_mem", "4gb")),
+        "theory_max_active": int(cluster.get("theory_max_active", 50)),
+        "fit_max_active": int(cluster.get("fit_max_active", 100)),
+        "max_user_active": int(cluster.get("max_user_active", 300)),
+        "poll_seconds": float(cluster.get("poll_seconds", 30.0)),
+        "submit_delay_seconds": float(cluster.get("submit_delay_seconds", 0.2)),
+    }
+    for stage in ("theory", "fit"):
+        key = f"{stage}_walltime"
+        if key in cluster:
+            cluster_config[key] = str(cluster[key])
+
+    config = {
+        "schema_version": 1,
+        "campaign_id": spec["campaign_id"],
+        "description": spec.get("description", ""),
+        "model_family": "accdm",
+        "grid_axes": list(GRID_AXES),
+        "manifest": "manifest.csv",
+        "data_dir": "data",
+        "base_model_name": base_model_path.name,
+        "base_model_hash": _digest(base),
+        "grid_spec_name": grid_spec_path.name,
+        "grid_spec_hash": _digest(spec),
+        "point_count": len(rows),
+        "active_point_count": sum(_truthy(row["active"]) for row in rows),
+        "model_settings": {
+            "kappa_acc": float(params["kappa_acc"]),
+            "a_t_acc": float(params["a_t_acc"]),
+            "omega_cdm_convention": "fixed_early_total",
+            "omega_cdm_early_total": float(base["omega_cdm_early_total"]),
+            "a_recombination": float(base["a_recombination"]),
+            "neutrino_convention": "two_massless_plus_one_massive_0p06eV",
+            "ncdm_fluid_approximation": int(params["ncdm_fluid_approximation"]),
+            "accdm_momentum_bins": int(
+                str(params["ncdm_N_momentum_bins"]).split(",")[-1].strip()
+            ),
+        },
+        "theory": {
+            "quality": quality,
+            "max_attempts": int(theory.get("max_attempts", 3)),
+        },
+        "fit": {
+            "mode": mode,
+            "strategy": fit_strategy,
+            "source_fit_dirs": source_fit_dirs,
+            "k_uv_cut": float(fit.get("k_uv_cut", 20.0)),
+            "covariance": fit.get("covariance", "paper_diag"),
+            "seeds": [int(value) for value in fit.get("seeds", [12345, 23456, 34567])],
+            "expanded_counterterm": bool(fit.get("expanded_counterterm", True)),
+            "full_six_dimensional": bool(fit.get("full_six_dimensional", False)),
+            "no_cutoff_continuation": bool(fit.get("no_cutoff_continuation", True)),
+            "de_maxiter": int(fit.get("de_maxiter", 300)),
+            "de_popsize": int(fit.get("de_popsize", 20)),
+            "max_attempts": int(fit.get("max_attempts", 3)),
+        },
+        "cluster": cluster_config,
+    }
+    _atomic_json(run_dir / "campaign.json", config)
+    return config
+
+
+def _default_base_model() -> Path:
+    return Path(__file__).with_name("base_model.json")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-model", type=Path, default=_default_base_model())
+    parser.add_argument("--grid-spec", type=Path, required=True)
+    parser.add_argument("--run-dir", type=Path, required=True)
+    args = parser.parse_args()
+
+    config = build_campaign(args.base_model, args.grid_spec, args.run_dir)
+    run_dir = args.run_dir.resolve()
+    print(f"campaign: {config['campaign_id']}")
+    print(f"points: {config['point_count']} ({config['active_point_count']} active)")
+    print(f"manifest: {run_dir / 'manifest.csv'}")
+    print(f"configuration: {run_dir / 'campaign.json'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

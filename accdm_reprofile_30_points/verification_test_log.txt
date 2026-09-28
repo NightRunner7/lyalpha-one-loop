@@ -1,0 +1,37 @@
+test_archived_lcdm_de_hard_budget (test_campaign.ArchivedLCDMOptimizerIntegrationTests.test_archived_lcdm_de_hard_budget) ... ok
+test_archived_lcdm_lbfgsb_and_full6_attempts (test_campaign.ArchivedLCDMOptimizerIntegrationTests.test_archived_lcdm_lbfgsb_and_full6_attempts) ... ok
+test_all_thirty_mock_pilot_campaign_resume_are_durable (test_campaign.CampaignBookkeepingTests.test_all_thirty_mock_pilot_campaign_resume_are_durable) ... ok
+test_exhaustion_retains_best_visited_with_matching_vector (test_campaign.CampaignBookkeepingTests.test_exhaustion_retains_best_visited_with_matching_vector) ... ok
+test_failed_validation_does_not_leave_half_cached_context (test_campaign.CampaignBookkeepingTests.test_failed_validation_does_not_leave_half_cached_context) ... ok
+test_false_residual_validation_blocks_context_and_profiling (test_campaign.CampaignBookkeepingTests.test_false_residual_validation_blocks_context_and_profiling) ... ok
+test_interrupted_crosscheck_uses_frozen_second_start_after_best_changes (test_campaign.CampaignBookkeepingTests.test_interrupted_crosscheck_uses_frozen_second_start_after_best_changes)
+Synthetic full6 trial 0 improves best, then execution is interrupted. ... ok
+test_subset_snapshot_cannot_change_global_reference (test_campaign.CampaignBookkeepingTests.test_subset_snapshot_cannot_change_global_reference) ... ok
+test_coordinate_identity_and_duplicates_fail (test_inputs.InputVerificationTests.test_coordinate_identity_and_duplicates_fail) ... ok
+test_discovery_uses_only_named_export_or_frozen_baseline (test_inputs.InputVerificationTests.test_discovery_uses_only_named_export_or_frozen_baseline) ... ok
+test_known_project_root_remapping (test_inputs.InputVerificationTests.test_known_project_root_remapping) ... ok
+test_manifest_preserves_real_gap_and_peak_bracket (test_inputs.InputVerificationTests.test_manifest_preserves_real_gap_and_peak_bracket) ... ok
+test_missing_pilot_point_is_reported (test_inputs.InputVerificationTests.test_missing_pilot_point_is_reported) ... ok
+test_real_archival_lcdm_likelihood_roundtrip_and_stale_inputs (test_inputs.InputVerificationTests.test_real_archival_lcdm_likelihood_roundtrip_and_stale_inputs)
+Technical integration QA; this is expressly not an accDM result. ... ok
+test_real_frozen_snapshot_and_all_thirty_targets (test_inputs.InputVerificationTests.test_real_frozen_snapshot_and_all_thirty_targets) ... ok
+test_out_of_bounds_nonlinear_is_rejected (test_profiler.TestStableProfiler.test_out_of_bounds_nonlinear_is_rejected) ... ok
+test_real_fitter_broad_box_profiles_dominate_feasible_zero_ct (test_profiler.TestStableProfiler.test_real_fitter_broad_box_profiles_dominate_feasible_zero_ct) ... ok
+test_real_fitter_extreme_counterterm_keeps_tiny_amplitude (test_profiler.TestStableProfiler.test_real_fitter_extreme_counterterm_keeps_tiny_amplitude) ... ok
+test_real_lcdm_saved_and_profiled_identity (test_profiler.TestStableProfiler.test_real_lcdm_saved_and_profiled_identity) ... ok
+test_synthetic_correlated_covariance_whitening_and_boundary (test_profiler.TestStableProfiler.test_synthetic_correlated_covariance_whitening_and_boundary) ... ok
+test_synthetic_feasible_interior_recovers_exact_data (test_profiler.TestStableProfiler.test_synthetic_feasible_interior_recovers_exact_data) ... ok
+test_synthetic_four_active_edges_against_independent_qp (test_profiler.TestStableProfiler.test_synthetic_four_active_edges_against_independent_qp) ... ok
+test_synthetic_nearly_degenerate_columns_no_normal_equations (test_profiler.TestStableProfiler.test_synthetic_nearly_degenerate_columns_no_normal_equations) ... ok
+test_synthetic_rank_deficiency_still_finds_feasible_optimum (test_profiler.TestStableProfiler.test_synthetic_rank_deficiency_still_finds_feasible_optimum) ... ok
+test_archived_lcdm_and_extreme_ct_derivative_identity (test_residuals.ResidualRegression.test_archived_lcdm_and_extreme_ct_derivative_identity) ... ok
+test_bound_jacobian_uses_feasible_one_sided_differences (test_residuals.ResidualRegression.test_bound_jacobian_uses_feasible_one_sided_differences) ... ok
+test_correlated_whitening_is_not_inverse_covariance_residual (test_residuals.ResidualRegression.test_correlated_whitening_is_not_inverse_covariance_residual) ... ok
+test_full_jacobian_matches_finite_differences (test_residuals.ResidualRegression.test_full_jacobian_matches_finite_differences) ... ok
+test_independent_full_six_trf_recovers_tiny_amplitude (test_residuals.ResidualRegression.test_independent_full_six_trf_recovers_tiny_amplitude) ... ok
+test_signed_tiny_ct_and_zero_are_preserved (test_residuals.ResidualRegression.test_signed_tiny_ct_and_zero_are_preserved) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 16.939s
+
+OK
