@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from lyalpha_pt.models import ModelSpec
+from cluster.config import scheduler_config
 
 
 MPC_IN_KM = 3.0856775814913673e19
@@ -366,6 +367,7 @@ def build_campaign(base_model_path: Path, grid_spec_path: Path, run_dir: Path) -
             "max_attempts": int(fit.get("max_attempts", 3)),
         },
         "cluster": {
+            **scheduler_config(cluster),
             "conda_exe": cluster.get("conda_exe", "/opt/anaconda3/bin/conda"),
             "theory_env": cluster.get("theory_env", "class_decays"),
             "fit_env": cluster.get("fit_env", cluster.get("theory_env", "class_decays")),

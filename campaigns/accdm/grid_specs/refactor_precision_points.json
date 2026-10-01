@@ -1,0 +1,11 @@
+{
+  "description": "Diagnostic selection from the uploaded map and historical grid coordinates; editable before build. No interpolated or continued chi2 is used.",
+  "points": [
+    {"label": "peak_left", "log10m_acc": 12.4285714285714, "log10f_acc": -0.1},
+    {"label": "peak", "log10m_acc": 12.7142857142857, "log10f_acc": -0.1},
+    {"label": "peak_right", "log10m_acc": 13.0, "log10f_acc": -0.1},
+    {"label": "valley_suspect_1", "log10m_acc": 14.7142857142857, "log10f_acc": -1.375},
+    {"label": "valley_suspect_2", "log10m_acc": 15.0, "log10f_acc": -1.375},
+    {"label": "valley_control", "log10m_acc": 15.7142857142857, "log10f_acc": -1.375}
+  ]
+}

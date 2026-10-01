@@ -1,5 +1,10 @@
 # BOSS Ly-alpha one-loop reconstruction
 
+**Eagle / Slurm:** see [the Polish migration guide](docs/EAGLE_PL.md)
+for the `accDM_refactor` birth-grid profile (strategy 5, automatic bin count,
+`m_nu`, background_Nloga=40000), environment-aware campaign preparation and a
+one-point smoke test. Existing PBS campaigns remain supported.
+
 This project separates the calculation into three independent stages:
 
 1. `lyalpha_pt/models.py` contains the only model-dependent CLASS block.

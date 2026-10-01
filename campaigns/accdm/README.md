@@ -1,8 +1,17 @@
 # Accelerating-DM campaign definition
 
-This directory is the only accDM-specific layer of the Ly-alpha grid workflow.
-The shared CLASS/SPT generator, P1D projection, covariance treatment, nuisance
-fit, PBS templates, and campaign controller are unchanged.
+This directory is the accDM-specific layer of the Ly-alpha grid workflow.
+
+For **CLASS `accDM_refactor`**, use `base_models/base_model_refactor_birth.json`
+and follow [the Eagle / refactor guide](../../docs/EAGLE_PL.md). The same model
+can be passed explicitly to `build_grid` for PBS. The new profile uses `m_nu`,
+strategy `0, 5`, automatic daughter sampling, and the requested CLASS precision.
+`cluster.prepare_eagle` selects it for every SPT quality, including `smoke`.
+
+The fixed-q profiles and historical campaign recipes below are retained for
+existing calculations. `build_grid` alone still defaults to the legacy
+`base_model.json`; pass `--base-model` explicitly for a refactor campaign.
+Historical adaptive-scan/recovery helpers are not birth-grid convergence tests.
 
 ## Physical convention
 

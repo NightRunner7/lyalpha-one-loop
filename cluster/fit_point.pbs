@@ -15,7 +15,10 @@ set -Eeuo pipefail
 : "${K_UV_CUT:?K_UV_CUT is required}"
 : "${COVARIANCE:?COVARIANCE is required}"
 : "${SEEDS:?SEEDS is required}"
-: "${ENV_NAME:?ENV_NAME is required when PYTHON_BIN is not set}"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+    : "${ENV_NAME:?ENV_NAME is required when PYTHON_BIN is not set}"
+fi
+JOB_ID="${SLURM_JOB_ID:-${PBS_JOBID:-unknown}}"
 
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
@@ -37,7 +40,7 @@ write_failure() {
     printf '{"point_id":"%s","stage":"fit","exit_code":%d,"job_id":"%s","finished_at":"%s"}\n' \
         "${POINT_ID}" \
         "${exit_code}" \
-        "${PBS_JOBID:-unknown}" \
+        "${JOB_ID}" \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${temporary}"
     mv "${temporary}" "${FAILED_FILE}"
 }
@@ -86,7 +89,7 @@ if [[ "${FIT_STRATEGY:-standard}" == "neighbor_refit" ]]; then
 fi
 echo "output       : ${OUTPUT_FILE}"
 echo "host         : $(hostname)"
-echo "job ID       : ${PBS_JOBID:-unknown}"
+echo "job ID       : ${JOB_ID}"
 echo "python       : ${PYTHON_CMD}"
 echo "started      : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "============================================================"
@@ -111,6 +114,7 @@ chi2 = {mode: float(record["chi2"]) for mode, record in fit.get("fits", {}).item
 payload = {
     "point_id": point_id,
     "stage": "fit",
+    "job_id": os.environ.get("SLURM_JOB_ID", os.environ.get("PBS_JOBID", "unknown")),
     "fit_file": str(Path(fit_path).resolve()),
     "chi2": chi2,
     "delta_chi2_one_loop_minus_linear": fit.get("delta_chi2_one_loop_minus_linear"),

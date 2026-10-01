@@ -12,7 +12,10 @@ set -Eeuo pipefail
 : "${OUTPUT_FILE:?OUTPUT_FILE is required}"
 : "${CHECKPOINT_DIR:?CHECKPOINT_DIR is required}"
 : "${QUALITY:?QUALITY is required}"
-: "${ENV_NAME:?ENV_NAME is required when PYTHON_BIN is not set}"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+    : "${ENV_NAME:?ENV_NAME is required when PYTHON_BIN is not set}"
+fi
+JOB_ID="${SLURM_JOB_ID:-${PBS_JOBID:-unknown}}"
 
 export OMP_NUM_THREADS="${THEORY_THREADS:-1}"
 export OPENBLAS_NUM_THREADS=1
@@ -33,7 +36,7 @@ write_failure() {
     printf '{"point_id":"%s","stage":"theory","exit_code":%d,"job_id":"%s","finished_at":"%s"}\n' \
         "${POINT_ID}" \
         "${exit_code}" \
-        "${PBS_JOBID:-unknown}" \
+        "${JOB_ID}" \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${temporary}"
     mv "${temporary}" "${FAILED_FILE}"
 }
@@ -67,26 +70,40 @@ echo "model JSON   : ${MODEL_JSON}"
 echo "output       : ${OUTPUT_FILE}"
 echo "checkpoint   : ${CHECKPOINT_DIR}"
 echo "host         : $(hostname)"
-echo "job ID       : ${PBS_JOBID:-unknown}"
+echo "job ID       : ${JOB_ID}"
 echo "python       : ${PYTHON_CMD}"
 echo "started      : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "============================================================"
 
+# Check a pinned Eagle runtime even when an output already exists. A changed
+# CLASS installation must fail before considering any cached bundle.
+if [[ -n "${LYA_CLASS_SOURCE_DIR:-}" ]]; then
+    "${PYTHON_CMD}" -c 'import json; from lyalpha_pt.class_runtime import class_runtime; print(json.dumps(class_runtime(), indent=2))'
+fi
+
 verify_theory() {
-    "${PYTHON_CMD}" - "${OUTPUT_FILE}" "${MODEL_JSON}" <<'PY'
+    "${PYTHON_CMD}" - "${OUTPUT_FILE}" "${MODEL_JSON}" "${QUALITY}" <<'PY'
 import json
+import os
 import sys
+from dataclasses import asdict
 
-from lyalpha_pt.theory import load_theory
+from lyalpha_pt.class_runtime import class_runtime
+from lyalpha_pt.theory import LoopNumerics, load_theory
 
-theory_path, model_path = sys.argv[1:]
+theory_path, model_path, quality = sys.argv[1:]
 bundle = load_theory(theory_path)
-expected_model = json.load(open(model_path, encoding="utf-8"))["name"]
-actual_model = bundle.metadata["model"]["name"]
+expected_model = json.load(open(model_path, encoding="utf-8"))
+actual_model = bundle.metadata["model"]
 if actual_model != expected_model:
-    raise SystemExit(
-        f"Theory/model mismatch: bundle={actual_model!r}, expected={expected_model!r}"
-    )
+    raise SystemExit("Theory/model mismatch: full model configuration differs.")
+if bundle.metadata.get("numerics") != asdict(LoopNumerics.for_quality(quality)):
+    raise SystemExit("Theory quality differs from campaign configuration.")
+if os.environ.get("LYA_CLASS_SOURCE_DIR"):
+    expected = class_runtime()
+    stored = bundle.metadata.get("class_runtime", {})
+    if stored.get("classy_sha256") != expected["classy_sha256"] or stored.get("declared_source") != expected.get("declared_source"):
+        raise SystemExit("Theory CLASS provenance differs from this campaign.")
 print(f"verified theory digest: {bundle.metadata['bundle_digest']}")
 PY
 }
@@ -106,6 +123,7 @@ bundle = load_theory(theory_path)
 payload = {
     "point_id": point_id,
     "stage": "theory",
+    "job_id": os.environ.get("SLURM_JOB_ID", os.environ.get("PBS_JOBID", "unknown")),
     "theory_file": str(Path(theory_path).resolve()),
     "theory_digest": bundle.metadata["bundle_digest"],
     "model_name": bundle.metadata["model"]["name"],

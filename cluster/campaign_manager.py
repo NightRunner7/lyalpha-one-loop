@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Submit, monitor and resume model-independent Ly-alpha PBS campaigns."""
+"""Submit, monitor and resume model-independent Ly-alpha PBS/Slurm campaigns."""
 
 from __future__ import annotations
 
@@ -172,7 +172,7 @@ def point_state(
     stage: str,
     snapshot: QueueSnapshot | None,
 ) -> str:
-    """Return a filesystem-plus-qstat state for one point and stage."""
+    """Return a filesystem-plus-scheduler state for one point and stage."""
 
     if not point.active:
         return "inactive"
@@ -210,8 +210,43 @@ def _command_words(value: Any, default: str) -> list[str]:
     return words or [default]
 
 
+def _scheduler(campaign: Campaign) -> str:
+    scheduler = str(campaign.config.get("cluster", {}).get("scheduler", "pbs")).lower()
+    if scheduler not in {"pbs", "slurm"}:
+        raise ValueError(f"Unsupported cluster.scheduler: {scheduler!r}")
+    return scheduler
+
+
 def query_queue(campaign: Campaign) -> QueueSnapshot:
     cluster = campaign.config.get("cluster", {})
+    if _scheduler(campaign) == "slurm":
+        command = _command_words(cluster.get("squeue_command"), "squeue")
+        user = str(cluster.get("slurm_user", os.environ.get("USER") or getpass.getuser()))
+        result = subprocess.run(
+            [*command, "--noheader", "--array", "--user", user,
+             "--states=all", "--format=%i|%T"],
+            check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"squeue failed with exit code {result.returncode}: {result.stderr.strip()}"
+            )
+        terminal = {
+            "BOOT_FAIL", "CANCELLED", "COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL",
+            "OUT_OF_MEMORY", "PREEMPTED", "REVOKED", "TIMEOUT",
+        }
+        job_ids: set[str] = set()
+        for line in result.stdout.splitlines():
+            if not line.strip():
+                continue
+            fields = [value.strip() for value in line.split("|")]
+            if len(fields) != 2 or not re.fullmatch(r"[0-9]+(?:_[0-9]+)?(?:\+[0-9]+)?", fields[0]) or not fields[1]:
+                raise RuntimeError(f"Cannot parse squeue output; refusing to submit: {line!r}")
+            # Unknown/nonterminal states stay active: never resubmit a held,
+            # suspended, requeued or still-completing job.
+            if fields[1] not in terminal:
+                job_ids.add(fields[0])
+        return QueueSnapshot(frozenset(job_ids), len(job_ids))
     command = _command_words(cluster.get("qstat_command"), "qstat")
     user = str(cluster.get("pbs_user", os.environ.get("USER") or getpass.getuser()))
     result = subprocess.run(
@@ -260,7 +295,8 @@ def print_summary(campaign: Campaign, snapshot: QueueSnapshot | None) -> dict[st
     queue_label = "offline" if snapshot is None else str(snapshot.total_active)
     print(f"campaign: {campaign.campaign_id}")
     print(f"directory: {campaign.root}")
-    print(f"active jobs visible to qstat: {queue_label}")
+    queue_command = "squeue" if _scheduler(campaign) == "slurm" else "qstat"
+    print(f"active jobs visible to {queue_command}: {queue_label}")
     for stage in STAGES:
         counts = summary["stages"][stage]["counts"]
         rendered = ", ".join(f"{name}={value}" for name, value in counts.items())
@@ -296,6 +332,7 @@ def _qsub_variables(campaign: Campaign, point: Point, stage: str) -> dict[str, s
         "CAMPAIGN_DIR": str(campaign.root),
         "POINT_ID": point.point_id,
         "CONDA_EXE": str(cluster.get("conda_exe", "/opt/anaconda3/bin/conda")),
+        "PYTHON_BIN": "",
     }
     if stage == "theory":
         variables.update(
@@ -356,7 +393,12 @@ def _qsub_variables(campaign: Campaign, point: Point, stage: str) -> dict[str, s
         python_bin = str(cluster.get("fit_python", ""))
     if python_bin:
         variables["PYTHON_BIN"] = python_bin
-    _validate_qsub_variables(variables)
+    if stage == "theory" and cluster.get("class_source_dir"):
+        variables["LYA_CLASS_SOURCE_DIR"] = str(cluster["class_source_dir"])
+        variables["LYA_CLASS_SOURCE_COMMIT"] = str(cluster.get("class_source_commit", ""))
+        variables["LYA_CLASS_WRAPPER_SHA256"] = str(cluster.get("class_wrapper_sha256", ""))
+    if _scheduler(campaign) == "pbs":
+        _validate_qsub_variables(variables)
     return variables
 
 
@@ -427,24 +469,70 @@ def _qsub_command(campaign: Campaign, point: Point, stage: str) -> list[str]:
     ]
 
 
+def _sbatch_command(campaign: Campaign, point: Point, stage: str) -> list[str]:
+    cluster = campaign.config["cluster"]
+    # Share the existing validated one-node CPU/memory/thread contract.
+    _stage_resource_request(campaign, stage)
+    ncpus = int(cluster.get(f"{stage}_ncpus", 1))
+    memory = str(cluster.get(f"{stage}_mem", "8gb" if stage == "theory" else "4gb"))
+    memory = memory.strip().upper().removesuffix("B")
+    walltime = _stage_walltime_request(campaign, stage) or (
+        "24:00:00" if stage == "theory" else "12:00:00"
+    )
+    template = campaign.project_root / "cluster" / f"{stage}_point.slurm"
+    if not template.is_file():
+        raise FileNotFoundError(f"Missing Slurm template: {template}")
+    log_dir = campaign.root / "logs" / stage
+    log_dir.mkdir(parents=True, exist_ok=True)
+    command = [
+        *_command_words(cluster.get("sbatch_command"), "sbatch"),
+        "--parsable", "--export=ALL", "--nodes=1", "--ntasks=1",
+        f"--cpus-per-task={ncpus}", f"--mem={memory}", f"--time={walltime}",
+        f"--job-name={_job_name(campaign, point, stage)}",
+        f"--chdir={campaign.project_root}",
+        f"--output={log_dir / (point.point_id + '.%j.out')}",
+        f"--error={log_dir / (point.point_id + '.%j.err')}",
+    ]
+    for key in ("partition", "account", "qos"):
+        value = str(cluster.get(f"{stage}_{key}", cluster.get(key, ""))).strip()
+        if value:
+            if not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+                raise ValueError(f"Invalid Slurm {key}: {value!r}")
+            command.append(f"--{key}={value}")
+    return [*command, str(template)]
+
+
 def _submit_one(campaign: Campaign, point: Point, stage: str, dry_run: bool) -> str | None:
-    command = _qsub_command(campaign, point, stage)
+    scheduler = _scheduler(campaign)
+    command = (_sbatch_command if scheduler == "slurm" else _qsub_command)(campaign, point, stage)
+    variables = _qsub_variables(campaign, point, stage)
     if dry_run:
-        print(f"[dry-run] {shlex.join(command)}")
+        prefix = ["env", *[f"{key}={value}" for key, value in variables.items()]] if scheduler == "slurm" else []
+        print(f"[dry-run] {shlex.join([*prefix, *command])}")
         return None
+    kwargs = {}
+    if scheduler == "slurm":
+        # Values travel in the process environment, not in Slurm's comma-
+        # separated --export argument (paths may contain spaces or commas).
+        kwargs["env"] = {**os.environ, **variables}
     result = subprocess.run(
         command,
         check=False,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        **kwargs,
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"qsub failed for {point.point_id}: {result.stderr.strip()}"
+            f"{scheduler} submission failed for {point.point_id}: {result.stderr.strip()}"
         )
     job_id = result.stdout.strip().split()[0] if result.stdout.strip() else ""
-    if not job_id:
+    if scheduler == "slurm":
+        if not re.fullmatch(r"[0-9]+(?:;[A-Za-z0-9_.-]+)?", result.stdout.strip()):
+            raise RuntimeError(f"sbatch returned an invalid job ID: {result.stdout!r}")
+        job_id = job_id.split(";", 1)[0]
+    elif not job_id:
         raise RuntimeError(f"qsub returned no job ID for {point.point_id}.")
     old_record = _load_job_record(campaign, point, stage) or {}
     record = {
@@ -452,10 +540,12 @@ def _submit_one(campaign: Campaign, point: Point, stage: str, dry_run: bool) -> 
         "point_id": point.point_id,
         "stage": stage,
         "job_id": job_id,
+        "scheduler": scheduler,
         "job_name": _job_name(campaign, point, stage),
         "attempt": int(old_record.get("attempt", 0)) + 1,
         "submitted_at": _utc_now(),
         "command": command,
+        "variables": variables,
     }
     _atomic_json(campaign.job_record_path(point, stage), record)
     print(
@@ -727,6 +817,10 @@ def _cmd_watch(args: argparse.Namespace) -> int:
                 if requested_complete:
                     print("all requested stages are complete")
                     return 0
+                terminal_states = {"complete", "inactive", "failed", "exhausted", "blocked_theory_failed"}
+                if all(set(summary["stages"][stage]["counts"]).issubset(terminal_states) for stage in stages):
+                    print("campaign stopped with failed/exhausted points; inspect logs and use retry-failed")
+                    return 2
             interval = (
                 args.poll_seconds
                 if args.poll_seconds is not None

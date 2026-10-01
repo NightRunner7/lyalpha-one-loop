@@ -212,7 +212,7 @@ def prepare_recovery_campaigns(
     source = source.resolve()
     runs_root = runs_root.resolve()
     source_config = _load_json(source / "campaign.json")
-    if int(source_config.get("model_settings", {}).get("accdm_momentum_bins", -1)) != 5001:
+    if source_config.get("model_settings", {}).get("accdm_momentum_bins") != 5001:
         raise ValueError("The source campaign must use 5001 accDM momentum bins.")
     if int(source_config.get("model_settings", {}).get("ncdm_fluid_approximation", -1)) != 3:
         raise ValueError("The source campaign must use the exact NCDM hierarchy.")

@@ -12,6 +12,7 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 from .models import ModelSpec
+from .class_runtime import class_runtime
 from .spt import p13_channels_analytic, p13_channels_richardson, p22_channels
 
 
@@ -229,6 +230,8 @@ def _class_pk(cosmo, k_hmpc: np.ndarray, z: float, *, source: str, h: float) -> 
 
 
 def _sum_massive_neutrino_mass(params: dict[str, Any]) -> float:
+    if "m_nu" in params and "m_ncdm" in params:
+        raise ValueError("Use only one of m_nu or m_ncdm.")
     masses = params.get("m_ncdm", 0.0)
     degeneracies = params.get("deg_ncdm", 1.0)
 
@@ -239,12 +242,18 @@ def _sum_massive_neutrino_mass(params: dict[str, Any]) -> float:
             return [float(value)]
         return [float(item) for item in value]
 
-    mass_values = numbers(masses)
+    mass_values = (
+        [float(params["m_nu"])] * int(params.get("N_ncdm", 0))
+        if "m_nu" in params else numbers(masses)
+    )
     deg_values = numbers(degeneracies)
     if len(deg_values) == 1 and len(mass_values) > 1:
         deg_values *= len(mass_values)
     if len(mass_values) != len(deg_values):
         raise ValueError("m_ncdm and deg_ncdm have incompatible lengths.")
+    if "m_acc_in_GeV" in params:
+        # The last NCDM slot belongs to the accDM daughter, not a neutrino.
+        mass_values, deg_values = mass_values[:-1], deg_values[:-1]
     return float(np.dot(mass_values, deg_values))
 
 
@@ -374,6 +383,9 @@ def generate_theory(
             "The local fitting step does not require CLASS."
         ) from exc
 
+    runtime = class_runtime()
+    if verbose:
+        print("CLASS runtime: " + json.dumps(runtime, sort_keys=True), flush=True)
     class_params = model.class_input(
         z_max_pk=float(z[-1] + 0.2),
         pk_max_hmpc=1.05 * numerics.input_k_max,
@@ -512,6 +524,7 @@ def generate_theory(
         "generator_version": GENERATOR_VERSION,
         "model": model.as_dict(),
         "class_params": class_params,
+        "class_runtime": runtime,
         "numerics": asdict(numerics),
         "channels": list(CHANNELS),
         "tree_source": "total",

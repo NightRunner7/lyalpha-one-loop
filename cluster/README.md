@@ -1,5 +1,10 @@
 # Model-independent grid campaigns
 
+The manager supports PBS (the default) and Slurm through
+`cluster.scheduler="slurm"`. For Eagle use `python -m cluster.prepare_eagle`
+and [docs/EAGLE_PL.md](../docs/EAGLE_PL.md). The examples below describe the
+original PBS configuration.
+
 This layer schedules the validated shared engine; it does not contain another
 SPT implementation or another nuisance fitter.
 

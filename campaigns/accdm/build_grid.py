@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from lyalpha_pt.models import ModelSpec
+from cluster.config import scheduler_config
 
 
 GRID_AXES = ("log10m_acc", "log10f_acc")
@@ -206,7 +207,12 @@ def _validate_base_model(base: Mapping[str, Any]) -> None:
         "m_acc_in_GeV",
         "m_cdm_in_GeV",
         "eta_acc",
+        "E_acc_in_GeV",
         "f_acc",
+        "Omega_acc_cdm",
+        "omega_acc_cdm",
+        "Omega_ini_dcdm",
+        "omega_ini_dcdm",
     }.intersection(params)
     if forbidden:
         raise ValueError(
@@ -217,14 +223,22 @@ def _validate_base_model(base: Mapping[str, Any]) -> None:
         raise ValueError("accDM requires two NCDM entries: neutrino and accDM.")
     if not math.isclose(float(params.get("N_ur", -1.0)), 2.0308, rel_tol=0, abs_tol=1e-10):
         raise ValueError("The selected accDM neutrino convention requires N_ur=2.0308.")
+    if "m_nu" in params and "m_ncdm" in params:
+        raise ValueError("Use only one of m_nu or m_ncdm, as required by accDM_refactor.")
     masses = [value.strip() for value in str(params.get("m_ncdm", "")).split(",")]
     degeneracies = [
         value.strip() for value in str(params.get("deg_ncdm", "")).split(",")
     ]
-    if len(masses) != 2 or not math.isclose(float(masses[0]), 0.06):
+    if "m_nu" in params:
+        valid_mass = math.isclose(float(params["m_nu"]), 0.06)
+    else:
+        valid_mass = len(masses) == 2 and math.isclose(float(masses[0]), 0.06)
+    if not valid_mass:
         raise ValueError("The first NCDM entry must be the 0.06 eV neutrino.")
     if len(degeneracies) != 2 or not math.isclose(float(degeneracies[0]), 1.0):
         raise ValueError("The massive-neutrino NCDM entry must have degeneracy one.")
+    if float(degeneracies[-1]) != 1.0:
+        raise ValueError("The accDM daughter must have degeneracy one.")
     if int(params.get("ncdm_fluid_approximation", -1)) != 3:
         raise ValueError("Scientific accDM campaigns require the exact hierarchy (value 3).")
     if str(params.get("vary_Gamma_acc", "")).strip().lower() != "yes":
@@ -233,6 +247,53 @@ def _validate_base_model(base: Mapping[str, Any]) -> None:
         raise ValueError("accDM base model needs positive kappa_acc.")
     if not 0.0 < float(params.get("a_t_acc", 0.0)) < 1.0:
         raise ValueError("accDM base model needs 0 < a_t_acc < 1.")
+    _momentum_settings(params)
+
+
+def _momentum_settings(params: Mapping[str, Any]) -> dict[str, Any]:
+    """Record the requested sampling without inventing a CLASS-resolved bin count."""
+
+    def read_pair(key: str, alias: str) -> list[int] | None:
+        if key in params and alias in params:
+            raise ValueError(f"Use only one of {key!r} or its alias {alias!r}.")
+        raw = params.get(key, params.get(alias))
+        if raw is None:
+            return None
+        values = [int(value.strip()) for value in str(raw).split(",")]
+        if len(values) != 2:
+            raise ValueError(f"{key} needs two entries: neutrino, accDM daughter.")
+        return values
+
+    strategies = read_pair("ncdm_quadrature_strategy", "Quadrature strategy") or [0, 0]
+    if strategies[0] == 5 or strategies[-1] not in (4, 5):
+        raise ValueError("Use strategy 4 or 5 for the accDM daughter; strategy 5 is daughter-only.")
+    bins = read_pair("ncdm_N_momentum_bins", "Number of momentum bins")
+    if bins is not None and min(bins) < 3:
+        raise ValueError("Explicit momentum grids must have at least three bins.")
+    if strategies[-1] == 5:
+        tolerance = float(params.get("accdm_q_number_tol", 1e-6))
+        density = float(params.get("accdm_q_bins_per_decade", 50.0))
+        if not 0.0 < tolerance < 1.0:
+            raise ValueError("accdm_q_number_tol must lie in (0, 1).")
+        if not math.isfinite(density) or density <= 0.0:
+            raise ValueError("accdm_q_bins_per_decade must be finite and positive.")
+        if params.get("accdm_smooth_births", 0) not in (0, 1):
+            raise ValueError("accdm_smooth_births must be 0 or 1.")
+    return {
+        "accdm_quadrature_strategy": strategies[-1],
+        # None means selected by CLASS, not zero bins or an estimated count.
+        "accdm_momentum_bins": bins[-1] if bins is not None else None,
+        "accdm_momentum_sampling": (
+            "explicit" if bins is not None else
+            "birth_grid_density" if strategies[-1] == 5 else "class_default"
+        ),
+        "class_precision_inputs": {
+            key: params[key] for key in (
+                "background_Nloga", "accdm_q_number_tol", "accdm_q_bins_per_decade",
+                "accdm_smooth_births", "accdm_q_schedule", "acc_de_sink",
+            ) if key in params
+        },
+    }
 
 
 def _model_for_point(base: Mapping[str, Any], point: Mapping[str, Any]) -> ModelSpec:
@@ -428,6 +489,7 @@ def build_campaign(base_model_path: Path, grid_spec_path: Path, run_dir: Path) -
 
     params = base["class_params"]
     cluster_config = {
+        **scheduler_config(cluster),
         "conda_exe": cluster.get("conda_exe", "/opt/anaconda3/bin/conda"),
         "theory_env": cluster.get("theory_env", "class_accdm"),
         "fit_env": cluster.get("fit_env", cluster.get("theory_env", "class_accdm")),
@@ -473,9 +535,7 @@ def build_campaign(base_model_path: Path, grid_spec_path: Path, run_dir: Path) -
             "a_recombination": float(base["a_recombination"]),
             "neutrino_convention": "two_massless_plus_one_massive_0p06eV",
             "ncdm_fluid_approximation": int(params["ncdm_fluid_approximation"]),
-            "accdm_momentum_bins": int(
-                str(params["ncdm_N_momentum_bins"]).split(",")[-1].strip()
-            ),
+            **_momentum_settings(params),
         },
         "theory": {
             "quality": quality,
